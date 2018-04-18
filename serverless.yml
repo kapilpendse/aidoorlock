@@ -1,15 +1,15 @@
-# Welcome to Serverless!
+# Copyright 2017 Amazon.com, Inc. and its affiliates. All Rights Reserved.
 #
-# This file is the main config file for your service.
-# It's very minimal at this point and uses default values.
-# You can always add more config options for more control.
-# We've included some commented out config examples here.
-# Just uncomment any of them to get that config option.
+# Licensed under the Amazon Software License (the "License").
+# You may not use this file except in compliance with the License.
+# A copy of the License is located at
 #
-# For full config options, check the docs:
-#    docs.serverless.com
+#   http://aws.amazon.com/asl/
 #
-# Happy Coding!
+# or in the "license" file accompanying this file. This file is distributed
+# on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+# express or implied. See the License for the specific language governing
+# permissions and limitations under the License.
 
 service: aidoorlock
 
