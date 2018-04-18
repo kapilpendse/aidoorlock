@@ -109,4 +109,3 @@ To teardown the demo from your AWS account, open a terminal, navigate to the *ai
 
 ### Who do I talk to? ###
 * Kapil Pendse (kapilpen@amazon.com)
-* Danny Mak (makdann@amazon.com)
