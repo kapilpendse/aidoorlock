@@ -62,13 +62,25 @@ try:
     # In V2, sessionState in recognize_utterance response is base64-encoded JSON
     session_state_encoded = response['sessionState']
     session_state = json.loads(base64.b64decode(session_state_encoded).decode('utf-8'))
-    userSpokenPasscode = str(session_state['intent']['slots']['Passcode']['value']['interpretedValue'])
-    print(userSpokenPasscode)
 
-    if userSpokenPasscode == passcode:
-        os.system('python3 scripts/speak.py "' + allowPrompt + '" "' + HOST_REGION + '"')
-    else:
+    # Safely extract the passcode slot value with null checks at each level
+    intent = session_state.get('intent')
+    slots = intent.get('slots') if intent else None
+    passcode_slot = slots.get('Passcode') if slots else None
+    passcode_value = passcode_slot.get('value') if passcode_slot else None
+    interpreted_value = passcode_value.get('interpretedValue') if passcode_value else None
+
+    if interpreted_value is None:
+        print("Passcode slot was not filled by Lex")
         os.system('python3 scripts/speak.py "' + denyPrompt + '" "' + HOST_REGION + '"')
+    else:
+        userSpokenPasscode = str(interpreted_value)
+        print(userSpokenPasscode)
+
+        if userSpokenPasscode == passcode:
+            os.system('python3 scripts/speak.py "' + allowPrompt + '" "' + HOST_REGION + '"')
+        else:
+            os.system('python3 scripts/speak.py "' + denyPrompt + '" "' + HOST_REGION + '"')
 
     # End the conversation with lex bot
     response = lex.recognize_text(

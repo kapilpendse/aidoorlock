@@ -91,10 +91,21 @@ function create_lex_bot() {
 
 	echo "waiting for bot to be available"
 	BOT_STATUS=""
+	RETRY_COUNT=0
+	MAX_RETRIES=30
 	while [ "$BOT_STATUS" != "Available" ]; do
 		sleep 2
+		RETRY_COUNT=$((RETRY_COUNT + 1))
+		if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+			echo "ERROR: Timed out waiting for bot to become Available (status: $BOT_STATUS after $MAX_RETRIES attempts)" >&2
+			exit 1
+		fi
 		BOT_STATUS=$(aws --region $HOST_REGION lexv2-models describe-bot --bot-id "$BOT_ID" --output text --query 'botStatus')
 		echo "bot status: $BOT_STATUS"
+		if [ "$BOT_STATUS" = "Failed" ]; then
+			echo "ERROR: Bot creation failed (status: Failed)" >&2
+			exit 1
+		fi
 	done
 
 	echo "creating bot locale en_US"
@@ -107,12 +118,23 @@ function create_lex_bot() {
 
 	echo "waiting for locale to be built"
 	LOCALE_STATUS=""
+	RETRY_COUNT=0
+	MAX_RETRIES=30
 	while [ "$LOCALE_STATUS" != "Built" ] && [ "$LOCALE_STATUS" != "NotBuilt" ]; do
 		sleep 2
+		RETRY_COUNT=$((RETRY_COUNT + 1))
+		if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+			echo "ERROR: Timed out waiting for locale to be ready (status: $LOCALE_STATUS after $MAX_RETRIES attempts)" >&2
+			exit 1
+		fi
 		LOCALE_STATUS=$(aws --region $HOST_REGION lexv2-models describe-bot-locale \
 			--bot-id "$BOT_ID" --bot-version DRAFT --locale-id en_US \
 			--output text --query 'botLocaleStatus')
 		echo "locale status: $LOCALE_STATUS"
+		if [ "$LOCALE_STATUS" = "Failed" ]; then
+			echo "ERROR: Locale creation failed (status: Failed)" >&2
+			exit 1
+		fi
 	done
 
 	echo "creating intent RequestForEchoIntent"
@@ -159,12 +181,23 @@ function create_lex_bot() {
 
 	echo "waiting for bot locale to be built"
 	LOCALE_STATUS=""
+	RETRY_COUNT=0
+	MAX_RETRIES=30
 	while [ "$LOCALE_STATUS" != "Built" ]; do
 		sleep 5
+		RETRY_COUNT=$((RETRY_COUNT + 1))
+		if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+			echo "ERROR: Timed out waiting for locale to be Built (status: $LOCALE_STATUS after $MAX_RETRIES attempts)" >&2
+			exit 1
+		fi
 		LOCALE_STATUS=$(aws --region $HOST_REGION lexv2-models describe-bot-locale \
 			--bot-id "$BOT_ID" --bot-version DRAFT --locale-id en_US \
 			--output text --query 'botLocaleStatus')
 		echo "locale build status: $LOCALE_STATUS"
+		if [ "$LOCALE_STATUS" = "Failed" ]; then
+			echo "ERROR: Locale build failed (status: Failed)" >&2
+			exit 1
+		fi
 	done
 
 	echo "creating bot version"
