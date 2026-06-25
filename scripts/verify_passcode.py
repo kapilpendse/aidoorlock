@@ -49,9 +49,9 @@ try:
 	userSpokenPasscode = str(response['slots']['Passcode'])
 	print(str(response['slots']['Passcode']))
 	if(userSpokenPasscode == passcode):
-		os.system('python3 scripts/speak.py "' + allowPrompt + '"')
+		os.system('python3 scripts/speak.py "' + allowPrompt + '" "' + HOST_REGION + '"')
 	else:
-		os.system('python3 scripts/speak.py "' + denyPrompt + '"')
+		os.system('python3 scripts/speak.py "' + denyPrompt + '" "' + HOST_REGION + '"')
 
 	#end the conversation with lex bot
 	response = lex.post_text(

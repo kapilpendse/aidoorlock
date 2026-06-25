@@ -23,7 +23,7 @@ denyPrompt=$4
 HOST_REGION=$5
 
 # voice prompt asking for passcode
-python3 `pwd`/scripts/speak.py "$askPrompt"
+python3 `pwd`/scripts/speak.py "$askPrompt" "$HOST_REGION"
 
 # record the spoken passcode
 rec -c 1 -r 16000 -e signed -b 16 /tmp/audiorec.wav trim 0 0:00:05

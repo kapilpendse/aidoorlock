@@ -27,7 +27,7 @@ LOCAL_IMAGE_FILE_PATH="camera_captures/image.jpg"
 UPLOADED_FILE_NAME='image.jpg'
 
 # voice prompt before taking photo
-python3 `pwd`/scripts/speak.py "$VOICE_PROMPT_1"
+python3 `pwd`/scripts/speak.py "$VOICE_PROMPT_1" "$HOST_REGION"
 
 # Capture image using picam module
 #raspistill -w 800 -h 600 -q 70 -t 2 -o $LOCAL_IMAGE_FILE_PATH
@@ -39,7 +39,7 @@ python3 `pwd`/scripts/speak.py "$VOICE_PROMPT_1"
 imagesnap -w 1.5 $LOCAL_IMAGE_FILE_PATH
 
 # voice prompt after taking photo
-python3 `pwd`/scripts/speak.py "$VOICE_PROMPT_2"
+python3 `pwd`/scripts/speak.py "$VOICE_PROMPT_2" "$HOST_REGION"
 
 # upload the image to S3 bucket
 echo "uploading to $HOST_REGION $S3_BUCKET_NAME $UPLOADED_FILE_NAME from $LOCAL_IMAGE_FILE_PATH"

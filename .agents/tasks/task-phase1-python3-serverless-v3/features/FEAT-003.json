@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-003",
+  "type": "fix",
+  "description": "Address review findings: pass HOST_REGION to speak.py in all call sites and delete dead iamRoleStatements.json",
+  "status": "in_progress",
+  "steps": [
+    "In scripts/capture.sh: Add \"$HOST_REGION\" as second argument to both speak.py calls",
+    "In scripts/passcode.sh: Add \"$HOST_REGION\" as second argument to the speak.py call",
+    "In scripts/verify_passcode.py: Add HOST_REGION as second argument to both os.system speak.py calls",
+    "Delete iamRoleStatements.json (dead file no longer referenced by serverless.yml)"
+  ],
+  "acceptance_criteria": [
+    "All speak.py call sites pass the region as second argument",
+    "iamRoleStatements.json no longer exists in the repository",
+    "verify_passcode.py has valid Python syntax"
+  ],
+  "verification": [
+    "Run `grep -n 'speak.py' scripts/capture.sh scripts/passcode.sh` to confirm region is being passed",
+    "Run `grep -n 'speak.py' scripts/verify_passcode.py` to confirm region is being passed",
+    "Confirm iamRoleStatements.json no longer exists: `test ! -f iamRoleStatements.json && echo deleted`",
+    "Run `python3 -c \"import ast; ast.parse(open('scripts/verify_passcode.py').read())\"` to confirm valid syntax"
+  ],
+  "blocked_reason": null,
+  "findings": null
+}
