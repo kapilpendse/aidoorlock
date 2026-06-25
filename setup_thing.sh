@@ -30,6 +30,9 @@ AWS_IOT_THING_NAME_DOORBELL=$(cat .build/doorbell_thing_name.txt)
 AWS_IOT_THING_CERTIFICATE_DOORBELL="doorbell-certificate.pem.crt"
 AWS_IOT_THING_PRIVATE_KEY_DOORBELL="doorbell-private.pem.key"
 
+LEX_BOT_ID=$(cat .build/lex_bot_id.txt)
+LEX_BOT_ALIAS_ID=$(cat .build/lex_bot_alias_id.txt)
+
 ### CHECK PREREQUISITES ###
 
 # Python 3
@@ -128,7 +131,9 @@ cat > config.json << EOF
     "doorbell_client_id": "${AWS_IOT_MQTT_CLIENT_ID_DOORBELL}",
     "doorbell_thing_name": "${AWS_IOT_THING_NAME_DOORBELL}",
     "doorbell_cert_path": "certs/${AWS_IOT_THING_CERTIFICATE_DOORBELL}",
-    "doorbell_key_path": "certs/${AWS_IOT_THING_PRIVATE_KEY_DOORBELL}"
+    "doorbell_key_path": "certs/${AWS_IOT_THING_PRIVATE_KEY_DOORBELL}",
+    "lex_bot_id": "${LEX_BOT_ID}",
+    "lex_bot_alias_id": "${LEX_BOT_ALIAS_ID}"
 }
 EOF
 chmod 600 config.json

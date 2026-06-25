@@ -11,5 +11,7 @@
     "doorbell_client_id": "doorbell",
     "doorbell_thing_name": "doorbell",
     "doorbell_cert_path": "certs/doorbell-certificate.pem.crt",
-    "doorbell_key_path": "certs/doorbell-private.pem.key"
+    "doorbell_key_path": "certs/doorbell-private.pem.key",
+    "lex_bot_id": "YOUR_LEX_BOT_ID",
+    "lex_bot_alias_id": "YOUR_LEX_BOT_ALIAS_ID"
 }

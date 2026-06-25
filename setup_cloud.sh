@@ -66,58 +66,148 @@ function check_prerequisites () {
 
 }
 
-# CREATE LEX BOT
+# CREATE LEX V2 BOT
 function create_lex_bot() {
-	echo "checking if service linked role for Lex already exists"
-	LEX_SERVICE_ROLE=$(aws iam get-role --role-name AWSServiceRoleForLexBots --output text --query 'Role.RoleId')
+	echo "checking if service linked role for Lex V2 already exists"
+	LEX_SERVICE_ROLE=$(aws iam get-role --role-name AWSServiceRoleForLexV2Bots --output text --query 'Role.Arn' 2>/dev/null)
 	if [ -z "$LEX_SERVICE_ROLE" ]; then
 		echo "no, creating one"
-	    aws iam create-service-linked-role --aws-service-name lex.amazonaws.com
+		aws iam create-service-linked-role --aws-service-name lexv2.amazonaws.com
+		echo "waiting for role to propagate"
+		sleep 10
+		LEX_SERVICE_ROLE=$(aws iam get-role --role-name AWSServiceRoleForLexV2Bots --output text --query 'Role.Arn')
 	else
-		echo "yes, 'AWSServiceRoleForLexBots' exists"
+		echo "yes, 'AWSServiceRoleForLexV2Bots' exists"
 	fi
-	echo "creating intent"
-	aws --region $HOST_REGION lex-models put-intent --name RequestForEchoIntent --cli-input-json file://lex/RequestForEchoIntent.json
-	echo "getting intent's checksum"
-	LEX_INTENT_CHECKSUM=$(aws --region $HOST_REGION lex-models get-intent --name RequestForEchoIntent --intent-version "\$LATEST" --output text --query 'checksum')
-	echo "publishing intent version for checksum $LEX_INTENT_CHECKSUM"
-	LEX_INTENT_VERSION=$(aws --region $HOST_REGION lex-models create-intent-version --name RequestForEchoIntent --checksum "$LEX_INTENT_CHECKSUM" --output text --query 'version')
-	echo "generating lex bot json file"
-	cp lex/AIDoorLockEchoBot_template.json lex/AIDoorLockEchoBot.json
-	sed -i -e "s/LEX_INTENT_VERSION/$LEX_INTENT_VERSION/g" lex/AIDoorLockEchoBot.json
-	echo "creating lex bot"
-	LEX_BOT_STATUS=$(aws --region $HOST_REGION lex-models put-bot --name AIDoorLockEchoBot --cli-input-json file://lex/AIDoorLockEchoBot.json --output text --query 'status')
-	while [ "$LEX_BOT_STATUS" != "READY" ]; do
-		echo "checking lex bot status: $LEX_BOT_STATUS, please wait"
+
+	echo "creating Lex V2 bot"
+	BOT_ID=$(aws --region $HOST_REGION lexv2-models create-bot \
+		--bot-name AIDoorLockEchoBot \
+		--data-privacy '{"childDirected":false}' \
+		--idle-session-ttl-in-seconds 60 \
+		--role-arn "$LEX_SERVICE_ROLE" \
+		--output text --query 'botId')
+	echo "bot created with ID: $BOT_ID"
+
+	echo "waiting for bot to be available"
+	BOT_STATUS=""
+	while [ "$BOT_STATUS" != "Available" ]; do
 		sleep 2
-		LEX_BOT_STATUS=$(aws --region $HOST_REGION lex-models get-bot --name AIDoorLockEchoBot --version-or-alias "\$LATEST" --output text --query 'status')
+		BOT_STATUS=$(aws --region $HOST_REGION lexv2-models describe-bot --bot-id "$BOT_ID" --output text --query 'botStatus')
+		echo "bot status: $BOT_STATUS"
 	done
-	echo "checking lex bot status: $LEX_BOT_STATUS"
-	echo "lex bot created, getting checksum"
-	LEX_BOT_CHECKSUM=$(aws --region $HOST_REGION lex-models get-bot --name AIDoorLockEchoBot --version-or-alias "\$LATEST" --output text --query 'checksum')
-	echo "publishing lex bot for checksum $LEX_BOT_CHECKSUM"
-	LEX_BOT_VERSION=$(aws --region $HOST_REGION lex-models create-bot-version --name AIDoorLockEchoBot --checksum "$LEX_BOT_CHECKSUM" --output text --query 'version')
-	echo "checking lex bot status"
-	LEX_BOT_STATUS=$(aws --region $HOST_REGION lex-models get-bot --name AIDoorLockEchoBot --version-or-alias "$LEX_BOT_VERSION" --output text --query 'status')
-	while [ "$LEX_BOT_STATUS" != "READY" ]; do
-		echo "checking lex bot status: $LEX_BOT_STATUS, please wait"
+
+	echo "creating bot locale en_US"
+	aws --region $HOST_REGION lexv2-models create-bot-locale \
+		--bot-id "$BOT_ID" \
+		--bot-version DRAFT \
+		--locale-id en_US \
+		--nlu-intent-confidence-threshold 0.40 \
+		--voice-settings '{"voiceId":"Salli"}'
+
+	echo "waiting for locale to be built"
+	LOCALE_STATUS=""
+	while [ "$LOCALE_STATUS" != "Built" ] && [ "$LOCALE_STATUS" != "NotBuilt" ]; do
 		sleep 2
-		LEX_BOT_STATUS=$(aws --region $HOST_REGION lex-models get-bot --name AIDoorLockEchoBot --version-or-alias "$LEX_BOT_VERSION" --output text --query 'status')
+		LOCALE_STATUS=$(aws --region $HOST_REGION lexv2-models describe-bot-locale \
+			--bot-id "$BOT_ID" --bot-version DRAFT --locale-id en_US \
+			--output text --query 'botLocaleStatus')
+		echo "locale status: $LOCALE_STATUS"
 	done
-	echo "checking lex bot status: $LEX_BOT_STATUS"
-	aws --region $HOST_REGION lex-models put-bot-alias --name Dev --bot-name AIDoorLockEchoBot --bot-version $LEX_BOT_VERSION
-	echo "Lex bot 'AIDoorLockEchoBot' published with alias 'Dev'"
+
+	echo "creating intent RequestForEchoIntent"
+	INTENT_ID=$(aws --region $HOST_REGION lexv2-models create-intent \
+		--bot-id "$BOT_ID" \
+		--bot-version DRAFT \
+		--locale-id en_US \
+		--intent-name RequestForEchoIntent \
+		--sample-utterances '[{"utterance":"Echo my passcode"}]' \
+		--intent-confirmation-setting '{"promptSpecification":{"messageGroups":[{"message":{"plainTextMessage":{"value":"Your passcode is {Passcode}, is that correct?"}}}],"maxRetries":2},"declinationResponse":{"messageGroups":[{"message":{"plainTextMessage":{"value":"Alright, go away."}}}]}}' \
+		--intent-closing-setting '{"closingResponse":{"messageGroups":[{"message":{"plainTextMessage":{"value":"OK, goodbye."}}}]}}' \
+		--output text --query 'intentId')
+	echo "intent created with ID: $INTENT_ID"
+
+	echo "creating slot Passcode on intent"
+	SLOT_ID=$(aws --region $HOST_REGION lexv2-models create-slot \
+		--bot-id "$BOT_ID" \
+		--bot-version DRAFT \
+		--locale-id en_US \
+		--intent-id "$INTENT_ID" \
+		--slot-name Passcode \
+		--slot-type-id AMAZON.Number \
+		--value-elicitation-setting '{"slotConstraint":"Required","promptSpecification":{"messageGroups":[{"message":{"plainTextMessage":{"value":"What is the passcode?"}}}],"maxRetries":2}}' \
+		--output text --query 'slotId')
+	echo "slot created with ID: $SLOT_ID"
+
+	echo "updating intent with slot priority"
+	aws --region $HOST_REGION lexv2-models update-intent \
+		--bot-id "$BOT_ID" \
+		--bot-version DRAFT \
+		--locale-id en_US \
+		--intent-id "$INTENT_ID" \
+		--intent-name RequestForEchoIntent \
+		--sample-utterances '[{"utterance":"Echo my passcode"}]' \
+		--slot-priorities "[{\"priority\":1,\"slotId\":\"$SLOT_ID\"}]" \
+		--intent-confirmation-setting '{"promptSpecification":{"messageGroups":[{"message":{"plainTextMessage":{"value":"Your passcode is {Passcode}, is that correct?"}}}],"maxRetries":2},"declinationResponse":{"messageGroups":[{"message":{"plainTextMessage":{"value":"Alright, go away."}}}]}}' \
+		--intent-closing-setting '{"closingResponse":{"messageGroups":[{"message":{"plainTextMessage":{"value":"OK, goodbye."}}}]}}' > /dev/null
+
+	echo "building bot locale"
+	aws --region $HOST_REGION lexv2-models build-bot-locale \
+		--bot-id "$BOT_ID" \
+		--bot-version DRAFT \
+		--locale-id en_US
+
+	echo "waiting for bot locale to be built"
+	LOCALE_STATUS=""
+	while [ "$LOCALE_STATUS" != "Built" ]; do
+		sleep 5
+		LOCALE_STATUS=$(aws --region $HOST_REGION lexv2-models describe-bot-locale \
+			--bot-id "$BOT_ID" --bot-version DRAFT --locale-id en_US \
+			--output text --query 'botLocaleStatus')
+		echo "locale build status: $LOCALE_STATUS"
+	done
+
+	echo "creating bot version"
+	BOT_VERSION=$(aws --region $HOST_REGION lexv2-models create-bot-version \
+		--bot-id "$BOT_ID" \
+		--bot-version-locale-specification '{"en_US":{"sourceBotVersion":"DRAFT"}}' \
+		--output text --query 'botVersion')
+	echo "bot version created: $BOT_VERSION"
+
+	echo "creating bot alias 'Dev'"
+	BOT_ALIAS_ID=$(aws --region $HOST_REGION lexv2-models create-bot-alias \
+		--bot-alias-name Dev \
+		--bot-id "$BOT_ID" \
+		--bot-version "$BOT_VERSION" \
+		--output text --query 'botAliasId')
+	echo "bot alias created with ID: $BOT_ALIAS_ID"
+
+	echo "$BOT_ID" > .build/lex_bot_id.txt
+	echo "$BOT_ALIAS_ID" > .build/lex_bot_alias_id.txt
+
+	echo "Lex V2 bot 'AIDoorLockEchoBot' published with alias 'Dev' (botId=$BOT_ID, aliasId=$BOT_ALIAS_ID)"
 }
 
-# DELETE LEX BOT
+# DELETE LEX V2 BOT
 function delete_lex_bot() {
-	echo "deleting bot alias"
-	aws --region $HOST_REGION lex-models delete-bot-alias --name Dev --bot-name AIDoorLockEchoBot
-	echo "deleting bot"
-	aws --region $HOST_REGION lex-models delete-bot --name AIDoorLockEchoBot
-	sleep 5
-	echo "deleting intent"
-	aws --region $HOST_REGION lex-models delete-intent --name RequestForEchoIntent
+	if [ ! -f ".build/lex_bot_id.txt" ]; then
+		echo "lex_bot_id.txt not found, skipping Lex bot deletion"
+		return
+	fi
+	BOT_ID=$(cat .build/lex_bot_id.txt)
+
+	if [ -f ".build/lex_bot_alias_id.txt" ]; then
+		BOT_ALIAS_ID=$(cat .build/lex_bot_alias_id.txt)
+		echo "deleting bot alias $BOT_ALIAS_ID"
+		aws --region $HOST_REGION lexv2-models delete-bot-alias \
+			--bot-id "$BOT_ID" \
+			--bot-alias-id "$BOT_ALIAS_ID"
+		sleep 2
+	fi
+
+	echo "deleting bot $BOT_ID (cascades to versions, locales, intents, slots)"
+	aws --region $HOST_REGION lexv2-models delete-bot --bot-id "$BOT_ID"
+	echo "Lex V2 bot deleted"
 }
 
 # prepend IAM username to the S3 bucket name
