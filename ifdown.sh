@@ -14,6 +14,5 @@
 # permissions and limitations under the License.
 
 echo "Stopping AI Door Lock Daemon" >> /tmp/aidoorlock.log
-pkill aidoorlock >> /tmp/aidoorlock.log
+pkill -f aidoorlock.py >> /tmp/aidoorlock.log
 echo "Done" >> /tmp/aidoorlock.log
-

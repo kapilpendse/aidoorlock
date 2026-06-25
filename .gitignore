@@ -32,3 +32,12 @@ var/
 # Serverless directories
 .serverless
 .build
+
+# Device configuration (contains secrets)
+config.json
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
