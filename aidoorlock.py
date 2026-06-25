@@ -93,6 +93,7 @@ logger = logging.getLogger("aidoorlock")
 # Global state
 # ---------------------------------------------------------------------------
 passcode = "0000"
+passcode_lock = threading.Lock()
 base_dir = os.path.dirname(os.path.abspath(__file__))
 shutdown_event = threading.Event()
 
@@ -106,21 +107,39 @@ def load_config(config_path=None):
 
 
 def get_self_ip(interface):
-    """Get the IP address of a network interface."""
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        import fcntl
-        import struct
-        ip = socket.inet_ntoa(
-            fcntl.ioctl(
-                s.fileno(),
-                0x8915,  # SIOCGIFADDR
-                struct.pack("256s", interface.encode("utf-8")[:15]),
-            )[20:24]
-        )
-        s.close()
-        return ip
-    except Exception:
+    """Get the IP address of a network interface (cross-platform)."""
+    if sys.platform == "linux":
+        try:
+            import fcntl
+            import struct
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            ip = socket.inet_ntoa(
+                fcntl.ioctl(
+                    s.fileno(),
+                    0x8915,  # SIOCGIFADDR
+                    struct.pack("256s", interface.encode("utf-8")[:15]),
+                )[20:24]
+            )
+            s.close()
+            return ip
+        except Exception:
+            return None
+    elif sys.platform == "darwin":
+        # macOS: use socket.getaddrinfo as a fallback
+        try:
+            # Map common Linux interface names to a hostname lookup
+            # On macOS, we resolve the hostname to get a routable IP
+            hostname = socket.gethostname()
+            addrs = socket.getaddrinfo(hostname, None, socket.AF_INET)
+            for addr in addrs:
+                ip = addr[4][0]
+                if ip and not ip.startswith("127."):
+                    return ip
+            return None
+        except Exception:
+            return None
+    else:
+        # Unsupported platform
         return None
 
 
@@ -184,16 +203,19 @@ def cmd_handler_update_passcode(payload, config):
     logger.info("Update Passcode")
     # Payload format: "UPDATE PASSCODE XXXX"
     new_passcode = payload[len(CMD_UPDATE_PASSCODE) + 1:][:4]
-    passcode = new_passcode
-    logger.info("New passcode is %s", passcode)
+    with passcode_lock:
+        passcode = new_passcode
+    logger.debug("New passcode is %s", new_passcode)
     run_speak(POLLY_PROMPT_SENDING_SMS, config["host_region"])
 
 
 def cmd_handler_ask_secret(config):
     """Handle ASK SECRET command."""
     logger.info("Ask Secret")
+    with passcode_lock:
+        current_passcode = passcode
     run_passcode(
-        passcode,
+        current_passcode,
         POLLY_PROMPT_ASK_SECRET,
         POLLY_PROMPT_ALLOW_ACCESS,
         POLLY_PROMPT_DENY_ACCESS,

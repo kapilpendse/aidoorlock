@@ -58,6 +58,20 @@ else
     echo "$AWS_IOT_THING_PRIVATE_KEY found"
 fi
 
+# Check if doorbell certificate and private key are present in 'certs' folder
+if [ ! -f certs/$AWS_IOT_THING_CERTIFICATE_DOORBELL ]; then
+    echo "$AWS_IOT_THING_CERTIFICATE_DOORBELL is not present in the 'certs' folder. Aborting."
+    exit 1
+else
+    echo "$AWS_IOT_THING_CERTIFICATE_DOORBELL found"
+fi
+if [ ! -f certs/$AWS_IOT_THING_PRIVATE_KEY_DOORBELL ]; then
+    echo "$AWS_IOT_THING_PRIVATE_KEY_DOORBELL is not present in the 'certs' folder. Aborting."
+    exit 1
+else
+    echo "$AWS_IOT_THING_PRIVATE_KEY_DOORBELL found"
+fi
+
 # If OS is Mac, check for brew
 if [ "$(uname)" = "Darwin" ]; then
     command -v brew > /dev/null 2>&1 || { echo "brew was not detected. Aborting." >&2; exit 1; }
