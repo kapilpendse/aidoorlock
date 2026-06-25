@@ -33,14 +33,22 @@ python3 `pwd`/scripts/speak.py "$VOICE_PROMPT_1" "$HOST_REGION"
 if command -v libcamera-still > /dev/null 2>&1; then
     # Raspberry Pi with libcamera (preferred on RPi OS Bullseye+)
     libcamera-still -o "$LOCAL_IMAGE_FILE_PATH" --width 800 --height 600 -t 2000 --nopreview
+    if [ $? -ne 0 ]; then
+        echo "ERROR: libcamera-still failed to capture image." >&2
+        exit 1
+    fi
 elif command -v ffmpeg > /dev/null 2>&1; then
     # Cross-platform fallback using ffmpeg
     if [ "$(uname)" = "Darwin" ]; then
         # macOS - use avfoundation input
-        ffmpeg -y -f avfoundation -framerate 30 -i "0" -frames:v 1 "$LOCAL_IMAGE_FILE_PATH" 2>/dev/null
+        ffmpeg -y -f avfoundation -framerate 30 -i "0" -frames:v 1 "$LOCAL_IMAGE_FILE_PATH" 2>/tmp/capture_err.log
     else
         # Linux - use video4linux2 input
-        ffmpeg -y -f v4l2 -framerate 30 -i /dev/video0 -frames:v 1 "$LOCAL_IMAGE_FILE_PATH" 2>/dev/null
+        ffmpeg -y -f v4l2 -framerate 30 -i /dev/video0 -frames:v 1 "$LOCAL_IMAGE_FILE_PATH" 2>/tmp/capture_err.log
+    fi
+    if [ $? -ne 0 ]; then
+        echo "ERROR: ffmpeg failed to capture image. See /tmp/capture_err.log for details." >&2
+        exit 1
     fi
 else
     echo "ERROR: No supported camera capture tool found. Install libcamera-still or ffmpeg."

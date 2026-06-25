@@ -108,15 +108,18 @@ def main():
     connect_future.result()
     logger.info("Connected!")
 
-    # Publish CAPTURE PHOTO command
-    logger.info("Publishing '%s' to '%s'", CMD_CAPTURE_PHOTO, TOPIC_LOCKS_CMD)
+    # Publish CAPTURE PHOTO command (QoS 1 ensures delivery before disconnect)
+    logger.info("Publishing '%s' to '%s' (QoS 1)", CMD_CAPTURE_PHOTO, TOPIC_LOCKS_CMD)
     publish_future, packet_id = mqtt_connection.publish(
         topic=TOPIC_LOCKS_CMD,
         payload=CMD_CAPTURE_PHOTO,
-        qos=mqtt.QoS.AT_MOST_ONCE,
+        qos=mqtt.QoS.AT_LEAST_ONCE,
     )
-    publish_future.result()
-    logger.info("Publish done")
+    try:
+        publish_future.result()
+        logger.info("Publish acknowledged (packet_id=%s)", packet_id)
+    except Exception as e:
+        logger.warning("Publish may have failed: %s", e)
 
     # Play doorbell sound
     logger.info("Ding Dong")

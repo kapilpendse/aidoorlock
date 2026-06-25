@@ -131,6 +131,7 @@ cat > config.json << EOF
     "doorbell_key_path": "certs/${AWS_IOT_THING_PRIVATE_KEY_DOORBELL}"
 }
 EOF
+chmod 600 config.json
 
 echo ""
 echo "Thing setup succeeded!"
