@@ -28,7 +28,8 @@ AUDIO_FILE = "/tmp/audio.mp3"
 
 # Create a client using the credentials and region defined in the adminuser
 # section of the AWS credentials and configuration files
-session = Session(region_name="us-west-2")
+region = sys.argv[2] if len(sys.argv) > 2 else os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')
+session = Session(region_name=region)
 polly = session.client("polly")
 
 try:
@@ -43,7 +44,7 @@ try:
 					SampleRate="22050")
     audioStream = response.get("AudioStream")
     if audioStream:
-        mp3file = open(AUDIO_FILE, 'w')
+        mp3file = open(AUDIO_FILE, 'wb')
         # Note: Closing the stream is important as the service throttles on
         # the number of parallel connections. Here we are using
         # contextlib.closing to ensure the close method of the stream object

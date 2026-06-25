@@ -1,0 +1,17 @@
+{
+    "mqtt_host": "YOUR_IOT_ENDPOINT.iot.YOUR_REGION.amazonaws.com",
+    "mqtt_port": 8883,
+    "client_id": "aidoorlock",
+    "thing_name": "aidoorlock",
+    "cert_path": "certs/certificate.pem.crt",
+    "key_path": "certs/private.pem.key",
+    "root_ca_path": "certs/root-ca.pem",
+    "host_region": "us-east-1",
+    "s3_bucket_name": "YOUR_S3_BUCKET_NAME",
+    "doorbell_client_id": "doorbell",
+    "doorbell_thing_name": "doorbell",
+    "doorbell_cert_path": "certs/doorbell-certificate.pem.crt",
+    "doorbell_key_path": "certs/doorbell-private.pem.key",
+    "lex_bot_id": "YOUR_LEX_BOT_ID",
+    "lex_bot_alias_id": "YOUR_LEX_BOT_ALIAS_ID"
+}

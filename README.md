@@ -1,111 +1,262 @@
-# README #
+# AI Door Lock
 
-This is a concept demo of a door lock equipped with AI capabilities such as voice interaction and facial verification. It uses AWS services such as IoT, Rekognition, Polly, Lex, Lambda, S3 and SNS.
+This is a concept demo of a door lock equipped with AI capabilities such as voice interaction and facial verification. It uses AWS services such as IoT, Rekognition, Polly, Lex V2, Lambda, S3 and SNS.
 
-There are 2 components to this demo - the 'aidoorlock' program that runs on a thing and a bunch of cloud services that runs on AWS cloud. This demo supports the following platforms as 'thing' - Raspberry Pi 3 with:
+There are two components to this demo: the `aidoorlock.py` program that runs on a "thing" (a Raspberry Pi or any computer with a camera and speakers) and a set of cloud services that run on AWS. This demo supports the following platforms:
 
-* Raspbian (setup scripts don't work, WIP)
-* Debian/Ubuntu Linux (setup scripts don't work, WIP)
-* Mac with macOS Sierra
+* Raspberry Pi (with libcamera and PiCam or USB webcam)
+* macOS (with ffmpeg via avfoundation)
+* Linux (with ffmpeg and a webcam)
 
-Most of the setup process is automated, however some manual setup is still required. Refer to the "Setup Instructions" section below for step by step instructions.
+Most of the setup process is automated via `setup_cloud.sh` and `setup_thing.sh`. Some manual steps are still required (see Setup Instructions below).
 
-## Prerequisites ##
+## Prerequisites
 
 ### Common prerequisites for all platforms
-* [Python 2.7](https://www.python.org/download/releases/2.7/)
-* [AWS CLI version >=1.11.102](https://aws.amazon.com/cli/) *This is important because earlier versions of AWS CLI do not support Lex bot deployment.*
-* [AWS IoT Device SDK 2.1.1](https://github.com/aws/aws-iot-device-sdk-embedded-C/archive/v2.1.1.tar.gz)
-* [mbedTLS 2.1.1](https://github.com/ARMmbed/mbedtls/archive/mbedtls-2.1.1.tar.gz) library which is a dependency of the AWS IoT Device SDK 2.1.1
-* **make** and **gcc** for compiling the IoT programs.
-* [Node.js](https://nodejs.org/) and the [Serverless Framework](https://serverless.com/)
-* AWS SNS configured in your AWS account for sending out SMS, with default spending limit increased to suitable value
+* **Python 3.11+** with pip3
+* [AWS CLI v2](https://aws.amazon.com/cli/)
+* [Node.js](https://nodejs.org/) and [Serverless Framework v3](https://www.serverless.com/framework/docs)
+* [mpg123](https://mpg123.de/) for audio playback
+* [SoX](http://sox.sourceforge.net/) for audio recording (the `rec` command)
+* AWS SNS configured in your AWS account for sending out SMS, with the default spending limit set to a suitable value
 
-### Prerequisites for Raspberry Pi 3
-* Raspberry Pi 3 board with PiCam 2 or USB webcam
-* Raspbian
-* raspistill (comes with Raspbian, used only if using PiCam)
-* A USB audio sound card adaptor/dongle for connecting a speaker and a microphone. [Here's an example.](http://www.lazada.sg/easybuy-new-pc-laptop-usb-2-3d-virtual-kx3p-71-channel-audio-soundcard-adapter-9019448.html)
+### Prerequisites for Raspberry Pi
+* Raspberry Pi board with PiCam 2 or USB webcam
+* `libcamera-utils` package (provides `libcamera-still` for image capture)
+* `ffmpeg` (installed as fallback)
+* A USB audio sound card adaptor/dongle for connecting a speaker and a microphone
 
-### Prerequisites for Mac OSX with built-in webcam
-* [brew](https://brew.sh/)
+### Prerequisites for macOS
+* [Homebrew](https://brew.sh/)
+* `ffmpeg` (installed via `brew install ffmpeg`; uses avfoundation for camera capture)
 
-## Setup Instructions ##
+### Prerequisites for Linux (non-Raspberry Pi)
+* `ffmpeg` (uses video4linux2 for camera capture)
+* A webcam accessible at `/dev/video0`
 
-1. Download the AWS IoT Device SDK and mbedTLS library from the links above (common prerequisites section)
-2. Open a bash terminal and type in the following commands:
+## Setup Instructions
 
-~~~~
-mkdir ~/ai-iot-demo
-cd ~/ai-iot-demo
-tar xzf ~/Downloads/aws-iot-device-sdk-embedded-C-2.1.1.tar.gz # Change ~/Downloads to the path where you have downloaded the AWS Device SDK to
-cd aws-iot-device-sdk-embedded-C-2.1.1/external_libs/mbedTLS
-tar xzf ~/Downloads/mbedtls-mbedtls-2.1.1.tar.gz --strip-components 1  # Change ~/Downloads to the path where you have downloaded the mbedTLS library to
-cd ../../samples/linux
-git clone ssh://git.amazon.com/pkg/AIDoorLock # Code is hosted on Amazon's internal code.amazon.com; you will be asked for your Amazon account password.
-cd AIDoorLock
-vi setup_cloud.sh # Set HOST_REGION, BUCKET_FOR_IMAGES and GUEST_PHONE_NUMBER to your desired values. HOST_REGION must be set to the one that has Rekognition, Polly and Lex. Leave default value us-east-1 if you don't care where the demo runs. You can use any text editor.
+1. Clone this repository anywhere on your machine:
+
+```bash
+git clone https://github.com/kapilpendse/aidoorlock.git
+cd aidoorlock
+```
+
+2. Configure the cloud deployment variables. Open `setup_cloud.sh` in a text editor and set:
+   - `HOST_REGION` - AWS region (must support Polly, Lex V2, Rekognition, IoT, Lambda, S3, SNS, CloudWatch, and DynamoDB). Default: `us-east-1`
+   - `BUCKET_FOR_IMAGES` - name for the S3 bucket that stores captured images
+   - `GUEST_PHONE_NUMBER` - phone number to receive passcode SMS (e.g. `+1231231231`)
+
+3. Deploy the cloud services and provision device certificates:
+
+```bash
 ./setup_cloud.sh deploy
+```
+
+This script will:
+- Check prerequisites (python3, AWS CLI, Node.js, Serverless Framework)
+- Deploy Lambda functions (python3.12 runtime), DynamoDB table, S3 bucket, IoT things, and policies via Serverless Framework v3
+- Create and configure an Amazon Lex V2 bot (`AIDoorLockEchoBot`) for passcode verification
+- Provision IoT device certificates for both the door lock and doorbell
+- Save configuration to the `.build/` directory
+
+4. Set up the device (thing):
+
+```bash
 ./setup_thing.sh
-~~~~
+```
 
-If there are no errors, run `./aidoorlock`, the program should output the IP addresses of your computer (eth0 & wlan0) to STDOUT (along with a bunch of debug messages) and also publish the IP addresses to the AWS IoT topic 'locks/ip'; Additionally, you should hear the words 'Doorlock is ready' from your computer's speakers.
+This script will:
+- Check for python3, pip3, and AWS CLI
+- Install Python dependencies from `requirements.txt` (awsiotsdk, boto3, botocore)
+- Install mpg123, SoX, libcamera-utils (on Raspberry Pi), and ffmpeg
+- Generate `config.json` with MQTT connection details, certificate paths, AWS region, S3 bucket name, and Lex V2 bot identifiers
 
-### Setup of USB audio dongle on Raspberry Pi
-Edit ~/.asoundrc and replace its contents with following 2 lines:
-~~~~
+5. Upload a photo of the expected guest:
+   - Go to the S3 bucket (name specified in `BUCKET_FOR_IMAGES`) in the AWS S3 console
+   - Upload a clear frontal photo of the expected guest as `enrolled_guest.jpg`
+
+## Running the Demo
+
+1. Start the door lock program:
+
+```bash
+python3 aidoorlock.py
+```
+
+You should hear "Doorlock is ready" from the speakers and see IP addresses printed to the console.
+
+2. In another terminal window, simulate a doorbell press:
+
+```bash
+python3 doorbell.py
+```
+
+The doorbell plays a ding-dong sound and publishes a command via AWS IoT. The door lock receives the command and the interaction begins.
+
+### Using AWS IoT Button
+
+If you want to use a physical AWS IoT Button instead of the virtual doorbell, configure it in your AWS account and set up the Lambda function `lambda/iotButtonDoorbellPressed.py` as its trigger. The button publishes a message that the `aidoorlock.py` program picks up via AWS IoT.
+
+## Configuration
+
+Configuration is stored in `config.json` (generated by `setup_thing.sh`). See `config_template.json` for a reference of all fields:
+
+| Field | Description |
+|-------|-------------|
+| `mqtt_host` | AWS IoT endpoint |
+| `mqtt_port` | MQTT port (8883) |
+| `client_id` | MQTT client ID for the door lock |
+| `thing_name` | IoT thing name |
+| `cert_path` | Path to device certificate |
+| `key_path` | Path to device private key |
+| `root_ca_path` | Path to root CA certificate (`certs/root-ca.pem`) |
+| `host_region` | AWS region |
+| `s3_bucket_name` | S3 bucket for image uploads |
+| `doorbell_client_id` | MQTT client ID for the doorbell |
+| `doorbell_thing_name` | IoT thing name for the doorbell |
+| `doorbell_cert_path` | Path to doorbell certificate |
+| `doorbell_key_path` | Path to doorbell private key |
+| `lex_bot_id` | Lex V2 bot ID |
+| `lex_bot_alias_id` | Lex V2 bot alias ID |
+
+## Project Structure
+
+```
+aidoorlock/
+├── aidoorlock.py          # Main device program (MQTT subscriber, command handler)
+├── doorbell.py            # Doorbell simulator (publishes CAPTURE PHOTO command)
+├── config_template.json   # Reference for config.json fields
+├── requirements.txt       # Python dependencies (awsiotsdk, boto3, botocore)
+├── serverless.yml         # Serverless Framework v3 deployment config
+├── setup_cloud.sh         # Cloud setup and teardown script
+├── setup_thing.sh         # Device setup script (generates config.json)
+├── cloud_config.yml       # Template for Serverless variable resolution
+├── ifup.sh                # Network-up hook (auto-start on Raspberry Pi)
+├── ifdown.sh              # Network-down hook (auto-stop on Raspberry Pi)
+├── ding_dong.mp3          # Doorbell sound effect
+├── certs/                 # Device certificates (generated by setup_cloud.sh)
+│   └── root-ca.pem       # AWS IoT root CA
+├── camera_captures/       # Temporary image storage
+├── lambda/                # AWS Lambda function handlers
+│   ├── verifyFace.py      # Triggered on S3 upload; uses Rekognition
+│   ├── smsDeliveryHandler.py  # Processes SMS delivery logs
+│   ├── iotButtonDoorbellPressed.py  # IoT Button handler
+│   └── requirements.txt   # Lambda dependencies
+├── scripts/               # Device-side helper scripts
+│   ├── capture.sh         # Camera capture (libcamera-still or ffmpeg)
+│   ├── passcode.sh        # Passcode prompt and verification flow
+│   ├── speak.py           # Text-to-speech via Amazon Polly
+│   ├── s3uploader.py      # Upload images to S3
+│   ├── verify_passcode.py # Passcode verification via Lex V2
+│   └── requirements.txt   # Script dependencies
+└── sns/                   # SNS configuration templates
+```
+
+## Telling the Story
+
+Here is an outline of the story behind this demo:
+
+If you have ever used Airbnb, you will know that the first thing you do when you book an apartment is to coordinate with the host about your arrival time, so that the host can be there to give you the apartment keys. It is quite common that travel plans get disrupted due to flight delays and what not. When this happens, the host has only two miserable options: wait endlessly for the guest to arrive (because often the guest would not be reachable by phone), or leave the apartment locked and wait for the guest to somehow call you when they arrive.
+
+We have solved this problem by using AWS services to create a smart door lock with a camera. The door lock takes a picture of the guest when they press the doorbell, and uses Amazon Rekognition to verify that the person at the door is the expected guest. It then sends a dynamically generated 4-digit passcode via SMS to the expected guest's registered phone number. This is "multi-factor authentication" (MFA). The doorbell does not have any keypad. Instead, it implements a voice user interface (VUI). A speaker reads out instructions using Amazon Polly, and a microphone listens to what the guest speaks. Amazon Lex V2 is used to understand the spoken words. If the spoken words match the dynamically generated passcode, the speaker announces that the guest is welcome to enter; otherwise it scares the unexpected guest by saying that the police has been alerted.
+
+Behind the scenes, all of this interaction is stitched together by AWS IoT and AWS Lambda, with S3, DynamoDB, and SNS.
+
+This demo focuses on highlighting the ease with which it is possible to solve real-world problems using AWS services. The actual door lock hardware control is not implemented because that is fairly straightforward and well-understood technology (hook up the Raspberry Pi with a servo-controlled lock). Another reason to leave that component out of scope is that we want this demo to be portable and easy to set up.
+
+## Demo Runbook
+
+1. Log in to the AWS console and navigate to the S3 Management Console.
+2. Open the S3 bucket specified in `BUCKET_FOR_IMAGES` (at the top of `setup_cloud.sh`).
+3. Upload a photo of yourself (or the expected guest) with the file name `enrolled_guest.jpg`. It must be a full frontal photo with the face clearly visible. Do not use photos that have multiple faces.
+4. Open a terminal window, navigate to the project directory, and start the door lock:
+
+```bash
+python3 aidoorlock.py
+```
+
+Confirm that you see the program print out the local IP addresses. You should also hear "Doorlock is ready" from the speakers.
+
+5. Open another terminal window in the same project directory and run the doorbell:
+
+```bash
+python3 doorbell.py
+```
+
+6. If everything is set up correctly, the `aidoorlock.py` program receives the message published by `doorbell.py` (via AWS IoT), and you should hear voice instructions from the speakers.
+7. Follow the voice instructions. When prompted for a passcode, speak the 4-digit code that was sent to the registered phone number.
+
+## Teardown
+
+To tear down the demo from your AWS account:
+
+```bash
+./setup_cloud.sh teardown
+```
+
+This removes all cloud resources that were set up by the script, including IoT device certificates, the Lex V2 bot, Lambda functions, the DynamoDB table, and related infrastructure.
+
+## Autostart on Raspberry Pi
+
+To auto-start the application on Raspberry Pi boot, create symlinks for the network hooks:
+
+```bash
+sudo ln -s /home/pi/aidoorlock/ifup.sh /etc/network/if-up.d/aidoorlock
+sudo ln -s /home/pi/aidoorlock/ifdown.sh /etc/network/if-down.d/aidoorlock
+```
+
+You can customize the working directory by setting the `AIDOORLOCK_DIR` environment variable (defaults to `/home/pi/aidoorlock`).
+
+### USB Audio Dongle Setup (Raspberry Pi)
+
+Edit `~/.asoundrc` and replace its contents with:
+
+```
 pcm.!default plughw:Device
 ctl.!default plughw:Device
-~~~~
+```
 
-### Autostart on bootup of Raspberry Pi
-* To auto run the application on Raspberry Pi bootup, create links under /etc/network/if-up.d/ and /etc/network/if-down.d/ as below:
-* sudo ln -s /home/pi/deviceSDK/linux_mqtt_openssl/sample_apps/aidoorlock/ifup.sh /etc/network/if-up.d/aidoorlock
-* sudo ln -s /home/pi/deviceSDK/linux_mqtt_openssl/sample_apps/aidoorlock/ifdown.sh /etc/network/if-down.d/aidoorlock
+## Troubleshooting
 
-## Demo Suggestions ##
-The easiest way to run this demo is on a Mac with macOS Sierra. This is easy, portable and you don't need to setup a Raspberry Pi with all its accessories. Simply follow the setup instructions above, run `./aidoorlock` and then run `./doorbell` in another terminal window. The `doorbell` program publishes a message to an AWS IoT topic to simulate the pressing of an AWS IoT Button (see below). This message is picked up by the `aidoorlock` program and the magic begins.
+* **setup_cloud.sh fails with "Unable to validate the following destination configurations":**
+  - Go to CloudFormation in the AWS console and delete the stack named `aidoorlock-dev`. If deletion fails, choose to retain the S3 bucket `aidoorlock-dev-serverlessdeployment-*`, then delete the stack. Once the stack is deleted, remove the S3 bucket manually if it still exists.
+  - Run `./setup_cloud.sh deploy` again.
+  - This is a [known issue](https://github.com/serverless/serverless/issues/3038) with the Serverless Framework.
 
-### Using AWS IoT Button ###
-If you are feeling particularly adventurous, you can use an AWS IoT Button instead of the virtual doorbell. You will have to manually configure an AWS IoT Button in your account, setup the Lambda function 'lambda/iotButtonDoorbellPressed.py', and add a rule for the button so that it invokes the 'iotButtonDoorbellPressed.py' Lambda function.
+* **setup_cloud.sh fails with "A conflicting conditional operation is currently in progress against this resource":**
+  - Try changing the S3 bucket name in `setup_cloud.sh` (the `BUCKET_FOR_IMAGES` variable).
 
-### Telling the story ###
-Here's an outline of the story that I tell the audience: If you have ever used Airbnb, you will know that the first thing you do when you book an apartment is to coordinate with the host about your arrival time, so that the host can be there to give you the apartment keys. It is quite common that travel plans get disrupted due to flight delays and what not. When this happens, the host has only 2 miserable options: wait endlessly for the guest to arrive (because often the guest would not be reachable by phone), or leave the apartment locked and wait for the guest to somehow call you when they arrive (a great way to earn bad rating from the guest).
+* **setup_cloud.sh fails with "The specified bucket does not exist":**
+  - Go to CloudFormation in the AWS console and delete the stack named `aidoorlock-dev`.
 
-We've solved this problem by using AWS services to create a smart door lock with a camera. The door lock takes a picture of the guest when they press the doorbell, and uses Amazon Rekognition to verify that the person at the door is the expected guest. It then sends a dynamically generated 4 digit passcode via SMS to the expected guest's registered phone number. This is 'multi factor authentication' (MFA). The doorbell does not have any keypad. Instead, it implements a VUI (voice user interface). A speaker speaks out instructions using the Amazon Polly service, and a microphone listens to what the guest speaks, and uses the Amazon Lex service to understand the spoken words. If the spoken words match the dynamically generated passcode, the speaker announces that the guest is welcome to enter, otherwise it scares the unexpected guest by saying that the police has been alerted ;-)
+* **setup_cloud.sh deploy fails with a message about SNS log groups already existing:**
+  - Go to CloudWatch Logs in the AWS console and delete these log groups:
+    - `sns/<region>/<account-id>/DirectPublishToPhoneNumber`
+    - `sns/<region>/<account-id>/DirectPublishToPhoneNumber/Failure`
 
-Behind the scenes, all of this interaction is stitched together by AWS IoT and AWS Lambda services, with a delicious dressing of S3, DynamoDB and SNS.
+* **Face verification fails (Rekognition does not find a match):**
+  - Check `image.jpg` in the S3 bucket to see what the camera captured.
+  - Make sure the camera angle matches `enrolled_guest.jpg` (same height, similar lighting).
+  - If presenting on a stage with bright lights, capture a new enrollment photo under those conditions.
 
-This demo focuses on highlighting the ease with which it is possible to solve real world problems using AWS services. The actual door lock hardware control is not implemented because that is a fairly straight-forward and well understood technology - just hook up the Raspberry Pi with a servo controlled lock. Another reason to leave that component out of scope for this demo is that we want this demo to be portable and easy to setup. Setting up specialised hardware like servos and locks is straight-forward, but not easy & portable.
+* **Passcode not recognized:**
+  - You have about 5 seconds to speak the passcode after the prompt.
+  - Speak loudly and clearly; background noise interferes with recognition.
 
-## Demo Runbook ##
-1. Login to AWS console and navigate to the S3 Management Console.
-2. The `setup_cloud.sh` script creates a bucket where the `aidoorlock` program uploads captured photos for face verification. Name of this bucket can be found at the top of the `setup_cloud.sh` script (*BUCKET_FOR_IMAGES*). Open this bucket in the S3 Management Console.
-3. Upload a photo of yourself (or the expected guest) with the file name `enrolled_guest.jpg`. It must be a full frontal mugshot with the face clearly visible. Don't use photos that have multiple faces.
-4. Open a terminal window, navigate to the *aidoorlock* project directory, and run the door lock program like so: `./aidoorlock`. Confirm that you see the program print out the local IP addresses (eth0 and wlan0). You should also hear the words 'Doorlock is ready' from the speakers.
-5. Open another terminal window, navigate to the *aidoorlock* project directory, and run the door bell program like so: `./doorbell`.
-6. If everything is setup correctly, the *aidoorlock* program should receive the message that is published by *doorbell* (via AWS IoT), and you should hear voice instructions from the speakers.
-7. Follow the voice instructions.
+* **SMS not received:**
+  - The passcode is printed to the terminal where `aidoorlock.py` is running.
+  - You can also find the passcode in the DynamoDB table via the AWS console.
 
-## Teardown ##
-To teardown the demo from your AWS account, open a terminal, navigate to the *aidoorlock* project directory and run `./setup_cloud.sh teardown`. This will tear down all the cloud resources that were setup by this script, including IoT device certificates.
+* **Camera capture fails:**
+  - On Raspberry Pi: ensure `libcamera-still` works (`libcamera-still -o test.jpg`).
+  - On macOS: ensure `ffmpeg` is installed (`brew install ffmpeg`) and your camera is accessible via avfoundation.
+  - On Linux: ensure `ffmpeg` is installed and `/dev/video0` exists.
 
-## Troubleshooting ##
-* If the `setup_cloud.sh` script fails during deployment with the error message `Unable to validate the following destination configurations`, do the following steps:
-	* Login to your AWS web console, go to Cloud Formation page and delete the stack named 'aidoorlock-dev'. If this fails, delete again but this time choose to retain the S3 bucket 'aidoorlock-dev-serverlessdeployment-*'. Once the stack is deleted, delete the S3 bucket manually if it still exists.
-	* On your Raspberry Pi or computer, run the `setup_cloud.sh` script again.
-	* [This problem has been reported](https://github.com/serverless/serverless/issues/3038) by many users of the 'serverless' framework.
-* If the `setup_cloud.sh` script fails with an error like `S3BucketXYZ - A conflicting conditional operation is currently in progress against this resource.`, try changing the S3 bucket name: open the script in a text editor and change the bucket name assigned to the variable *BUCKET_FOR_IMAGES*.
-* If the `setup_cloud.sh` scripts fails with an error message *'The specified bucket does not exist.'*, go to your AWS Cloud Formation web console and delete the stack named **aidoorlock-dev**.
-* Amazon Rekognition is great, but face verification is sensitive and might not produce a match if the same person's face in *enrolled_guest.jpg* looks very different from the *image.jpg* captured by the *aidoorlock* program. Open the *image.jpg* file in the S3 bucket to see what the doorlock sees. Some aspects that affect the face verification:
-	* Camera orientation - make sure you capture your photo from the same angle as in *enrolled_guest.jpg*. Try to keep the camera as the same height as your face. If the camera is on a speaker's desk, chances are that it sees more of your chin and less of your forehead. Bend your knees when the camera takes your photo ;-)
-	* Background lights - if you are presenting from a stage that has strong lights on your face, these lights can throw the Rekognition off. It is best to capture a photo on the stage, then rename the file from *image.jpg* to *enrolled_guest.jpg*.
-* When the lock prompts you "A passcode has been sent to your phone, please read it out aloud.", you have 5 seconds to read the passcode. Speak loudly and clearly, because background noise is not your friend.
-* If `setup_cloud.sh deploy` fails with a message saying SNS log groups already exist, please go to CloudWatch console and delete these log groups:
-	* sns/<region>/<account-id>/DirectPublishToPhoneNumber
-	* sns/<region>/<account-id>/DirectPublishToPhoneNumber/Failure
-* If you don't receive the SMS, fret not, the *aidoorlock* program prints out the passcode in the terminal, and you can also see the passcode in DynamoDB in the AWS console.
-* Contact me ;-)
+* **"python3 not found" or "pip3 not found":**
+  - Install Python 3.11 or later from [python.org](https://www.python.org/) or your system package manager.
 
-### Who do I talk to? ###
-* Kapil Pendse (kapilpen@amazon.com)
+### Contact
+
+* Kapil Pendse

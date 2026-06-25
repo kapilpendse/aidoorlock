@@ -13,9 +13,10 @@
 # express or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 
-cd /home/pi/deviceSDK/linux_mqtt_openssl/sample_apps/aidoorlock
+AIDOORLOCK_DIR="${AIDOORLOCK_DIR:-/home/pi/aidoorlock}"
+
+cd "$AIDOORLOCK_DIR"
 echo "Starting AI Door Lock Daemon in 30 seconds" > /tmp/aidoorlock.log
 sleep 30
-su -c "./aidoorlock > /tmp/aidoorlock2.log &" -s /bin/sh pi
+su -c "python3 aidoorlock.py >> /tmp/aidoorlock.log 2>&1 &" -s /bin/sh pi
 echo "Done" >> /tmp/aidoorlock.log
-

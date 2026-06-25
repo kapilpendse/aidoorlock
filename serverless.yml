@@ -12,14 +12,11 @@
 # permissions and limitations under the License.
 
 service: aidoorlock
-
-# You can pin your service to only deploy with a specific Serverless version
-# Check out our docs for more details
-# frameworkVersion: "=X.X.X"
+frameworkVersion: '3'
 
 provider:
   name: aws
-  runtime: python2.7
+  runtime: python3.12
 
 # you can overwrite defaults here
   stage: dev
@@ -27,7 +24,68 @@ provider:
 
 # IAM role for all Lambda functions in this service
   iamRoleStatements:
-    $ref: ./iamRoleStatements.json
+    - Effect: Allow
+      Action: "s3:*"
+      Resource: "*"
+    - Effect: Allow
+      Action:
+        - "dynamodb:*"
+        - "cloudwatch:DeleteAlarms"
+        - "cloudwatch:DescribeAlarmHistory"
+        - "cloudwatch:DescribeAlarms"
+        - "cloudwatch:DescribeAlarmsForMetric"
+        - "cloudwatch:GetMetricStatistics"
+        - "cloudwatch:ListMetrics"
+        - "cloudwatch:PutMetricAlarm"
+        - "datapipeline:ActivatePipeline"
+        - "datapipeline:CreatePipeline"
+        - "datapipeline:DeletePipeline"
+        - "datapipeline:DescribeObjects"
+        - "datapipeline:DescribePipelines"
+        - "datapipeline:GetPipelineDefinition"
+        - "datapipeline:ListPipelines"
+        - "datapipeline:PutPipelineDefinition"
+        - "datapipeline:QueryObjects"
+        - "iam:ListRoles"
+        - "sns:CreateTopic"
+        - "sns:DeleteTopic"
+        - "sns:ListSubscriptions"
+        - "sns:ListSubscriptionsByTopic"
+        - "sns:ListTopics"
+        - "sns:Subscribe"
+        - "sns:Unsubscribe"
+        - "sns:SetTopicAttributes"
+        - "lambda:CreateFunction"
+        - "lambda:ListFunctions"
+        - "lambda:ListEventSourceMappings"
+        - "lambda:CreateEventSourceMapping"
+        - "lambda:DeleteEventSourceMapping"
+        - "lambda:GetFunctionConfiguration"
+        - "lambda:DeleteFunction"
+      Resource: "*"
+    - Effect: Allow
+      Action:
+        - "rekognition:*"
+      Resource: "*"
+    - Effect: Allow
+      Action:
+        - "iot:Connect"
+        - "iot:Publish"
+        - "iot:Subscribe"
+        - "iot:Receive"
+        - "iot:GetThingShadow"
+        - "iot:UpdateThingShadow"
+      Resource: "*"
+    - Effect: Allow
+      Action:
+        - "sns:*"
+      Resource: "*"
+    - Effect: Allow
+      Action:
+        - "logs:CreateLogGroup"
+        - "logs:CreateLogStream"
+        - "logs:PutLogEvents"
+      Resource: "arn:aws:logs:*:*:*"
 
 functions:
   verifyFace:
@@ -49,8 +107,10 @@ functions:
     events:
       # - cloudwatchLog: 'DirectPublishToPhoneNumber'
       # - cloudwatchLog: 'DirectPublishToPhoneNumber/Failure'
-      - cloudwatchLog: 'sns/${file(.build/cloud_config.yml):hostRegion}/${file(.build/cloud_config.yml):accountId}/DirectPublishToPhoneNumber'
-      - cloudwatchLog: 'sns/${file(.build/cloud_config.yml):hostRegion}/${file(.build/cloud_config.yml):accountId}/DirectPublishToPhoneNumber/Failure'
+      - cloudwatchLog:
+          logGroup: 'sns/${file(.build/cloud_config.yml):hostRegion}/${file(.build/cloud_config.yml):accountId}/DirectPublishToPhoneNumber'
+      - cloudwatchLog:
+          logGroup: 'sns/${file(.build/cloud_config.yml):hostRegion}/${file(.build/cloud_config.yml):accountId}/DirectPublishToPhoneNumber/Failure'
 
 
 resources:
