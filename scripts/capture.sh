@@ -29,14 +29,28 @@ UPLOADED_FILE_NAME='image.jpg'
 # voice prompt before taking photo
 python3 `pwd`/scripts/speak.py "$VOICE_PROMPT_1" "$HOST_REGION"
 
-# Capture image using picam module
-#raspistill -w 800 -h 600 -q 70 -t 2 -o $LOCAL_IMAGE_FILE_PATH
+# Capture image - platform detection
+if command -v libcamera-still > /dev/null 2>&1; then
+    # Raspberry Pi with libcamera (preferred on RPi OS Bullseye+)
+    libcamera-still -o "$LOCAL_IMAGE_FILE_PATH" --width 800 --height 600 -t 2000 --nopreview
+elif command -v ffmpeg > /dev/null 2>&1; then
+    # Cross-platform fallback using ffmpeg
+    if [ "$(uname)" = "Darwin" ]; then
+        # macOS - use avfoundation input
+        ffmpeg -y -f avfoundation -framerate 30 -i "0" -frames:v 1 "$LOCAL_IMAGE_FILE_PATH" 2>/dev/null
+    else
+        # Linux - use video4linux2 input
+        ffmpeg -y -f v4l2 -framerate 30 -i /dev/video0 -frames:v 1 "$LOCAL_IMAGE_FILE_PATH" 2>/dev/null
+    fi
+else
+    echo "ERROR: No supported camera capture tool found. Install libcamera-still or ffmpeg."
+    exit 1
+fi
 
-# Capture image using USB webcam
-#fswebcam -r 1280x720 --no-banner --jpeg 100 -S 13 $LOCAL_IMAGE_FILE_PATH
-
-# Capture image using Mac's built-in webcam (FaceTime camera)
-imagesnap -w 1.5 $LOCAL_IMAGE_FILE_PATH
+# Legacy capture methods (kept for reference):
+# raspistill -w 800 -h 600 -q 70 -t 2 -o $LOCAL_IMAGE_FILE_PATH
+# fswebcam -r 1280x720 --no-banner --jpeg 100 -S 13 $LOCAL_IMAGE_FILE_PATH
+# imagesnap -w 1.5 $LOCAL_IMAGE_FILE_PATH
 
 # voice prompt after taking photo
 python3 `pwd`/scripts/speak.py "$VOICE_PROMPT_2" "$HOST_REGION"
