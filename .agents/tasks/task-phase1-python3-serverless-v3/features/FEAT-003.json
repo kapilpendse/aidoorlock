@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "fix",
   "description": "Address review findings: pass HOST_REGION to speak.py in all call sites and delete dead iamRoleStatements.json",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "In scripts/capture.sh: Add \"$HOST_REGION\" as second argument to both speak.py calls",
     "In scripts/passcode.sh: Add \"$HOST_REGION\" as second argument to the speak.py call",
@@ -21,5 +21,5 @@
     "Run `python3 -c \"import ast; ast.parse(open('scripts/verify_passcode.py').read())\"` to confirm valid syntax"
   ],
   "blocked_reason": null,
-  "findings": null
+  "findings": "All speak.py call sites now pass HOST_REGION as second argument. iamRoleStatements.json deleted. All verifications pass: grep confirms region args in capture.sh, passcode.sh, verify_passcode.py; ast.parse confirms valid Python syntax; file deletion confirmed."
 }
