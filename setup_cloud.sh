@@ -42,8 +42,8 @@ DOORBELL_THING_NAME="AIDoorBell"
 # CHECK PREREQUISITES
 function check_prerequisites () {
 	# Python
-	command -v python -V > /dev/null 2>&1 || { echo "Python was not detected. Aborting." >&2; exit 1; }
-	echo "python detected"
+	command -v python3 -V > /dev/null 2>&1 || { echo "Python was not detected. Aborting." >&2; exit 1; }
+	echo "python3 detected"
 
 	# AWS CLI
 	command -v aws --version > /dev/null 2>&1 || { echo "AWS CLI was not detected. Aborting." >&2; exit 1; }

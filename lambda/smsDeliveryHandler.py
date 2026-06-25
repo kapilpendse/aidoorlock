@@ -13,7 +13,8 @@
 
 import sys
 import gzip
-from StringIO import StringIO
+import base64
+from io import BytesIO
 import json
 import boto3
 import os
@@ -38,7 +39,7 @@ def lambda_handler(event, context):
         # print(logData)
         
         #decode and unzip the log data
-        decodedData = gzip.GzipFile(fileobj=StringIO(logData.decode('base64','strict'))).read()
+        decodedData = gzip.GzipFile(fileobj=BytesIO(base64.b64decode(logData))).read()
         print(decodedData)
         
         #convert the log data from JSON into a dictionary
@@ -61,5 +62,5 @@ def lambda_handler(event, context):
             sendCommandToLock('ASK SECRET')
             # sendCommandToLock('SMS FAILED')
     except:
-        print "Unexpected error:", sys.exc_info()[0]
+        print("Unexpected error:", sys.exc_info()[0])
     return "done"

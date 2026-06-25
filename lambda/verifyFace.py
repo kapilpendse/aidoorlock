@@ -126,7 +126,7 @@ def lambda_handler(event, context):
             sendCommandToLock('FACIAL VERIFICATION FAILED')
     except:
         print("Unexpected exception - likely InvalidParameterException in Rekognition (service bug?), should retry")
-        print "Unexpected error:", sys.exc_info()[0]
+        print("Unexpected error:", sys.exc_info()[0])
         sendCommandToLock('FACIAL VERIFICATION FAILED')
 
     return "done"
